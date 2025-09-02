@@ -1,0 +1,11 @@
+{
+  "java.import.gradle.enabled": false,
+  "java.configuration.updateBuildConfiguration": "disabled",
+  "java.import.exclusions": [
+    "**/android/**",
+    "**/ios/**",
+    "**/.dart_tool/**",
+    "**/build/**"
+],
+"java.project.explorer.showNonJavaResources": false
+}
