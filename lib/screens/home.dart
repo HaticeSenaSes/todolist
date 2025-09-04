@@ -1,9 +1,10 @@
+// lib/screens/home.dart
 import 'package:flutter/material.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:todolist/constants/color.dart';
-import 'package:todolist/constants/tasktype.dart';
-import 'package:todolist/model/task.dart';
+import 'package:todolist/model/todomodel.dart';
 import 'package:todolist/screens/add_new_task.dart';
+import 'package:todolist/service/todo_service.dart';
 import 'package:todolist/todoitem.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -14,55 +15,19 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // List<String> todo = ["Study Lesson", "Run 5K", "Go to party"];
-  // List<String> completed = ["Game meetup", "Take on trash"];
+  final TodoService _todoService = TodoService();
+  late final Future<List<TodoModel>> _todosFuture;
 
-  List<Task> todo = [
-    Task(
-      type: TaskType.note,
-      title: "Study Lesson",
-      description: "Study COMP211",
-      isCompleted: false,
-    ),
-    Task(
-      type: TaskType.contest,
-      title: "Run 5K",
-      description: "Run 5 km",
-      isCompleted: false,
-    ),
-    Task(
-      type: TaskType.calender,
-      title: "Go to party",
-      description: "Attent to party",
-      isCompleted: false,
-    ),
-  ];
-
-  List<Task> completed = [
-    Task(
-      type: TaskType.contest,
-      title: "Run 5K",
-      description: "Run 5 km",
-      isCompleted: false,
-    ),
-    Task(
-      type: TaskType.calender,
-      title: "Go to party",
-      description: "Attent to party",
-      isCompleted: false,
-    ),
-  ];
-
-  void addNewTask(Task newTask) {
-    setState(() {
-      todo.add(newTask);
-    });
+  @override
+  void initState() {
+    super.initState();
+    _todosFuture = _todoService.getTodos();
   }
 
   @override
   Widget build(BuildContext context) {
-    double deviceHeight = MediaQuery.of(context).size.height;
-    double deviceWidth = MediaQuery.of(context).size.width;
+    final deviceHeight = MediaQuery.of(context).size.height;
+    final deviceWidth = MediaQuery.of(context).size.width;
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -109,65 +74,111 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              // Top Column
+
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                  child: SingleChildScrollView(
-                    child: ListView.builder(
-                      primary: false,
-                      shrinkWrap: true,
-                      itemCount: todo.length,
-                      itemBuilder: (context, index) {
-                        return ToDoItem(task: todo[index]);
-                      },
-                    ),
-                  ),
-                ),
-              ),
-              // Completed Text
-              const Padding(
-                padding: EdgeInsets.only(left: 16),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "Completed",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              // Bottom Column
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 10),
-                  child: SingleChildScrollView(
-                    child: ListView.builder(
-                      primary: false,
-                      shrinkWrap: true,
-                      itemCount: completed.length,
-                      itemBuilder: (context, index) {
-                        return ToDoItem(task: completed[index]);
-                      },
-                    ),
+                  child: FutureBuilder<List<TodoModel>>(
+                    future: _todosFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Hata: ${snapshot.error}'));
+                      }
+
+                      final all = snapshot.data ?? [];
+                      final active = all.where((t) => !t.completed).toList();
+                      final done = all.where((t) => t.completed).toList();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Flexible(
+                            flex: 2,
+                            child: ListView.builder(
+                              padding: EdgeInsets.zero,
+                              itemCount: active.length,
+                              itemBuilder: (_, i) => ToDoItem(task: active[i]),
+                            ),
+                          ),
+
+                          const SizedBox(height: 12),
+                          Flexible(
+                            flex: 2,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.only(left: 4, bottom: 8),
+                                  child: Text(
+                                    "Completed",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: ListView.builder(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      itemCount: done.length,
+                                      itemBuilder: (_, i) =>
+                                          ToDoItem(task: done[i]),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),
 
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => AddNewTaskScreen(
-                        addNewTask: (newTask) => addNewTask(newTask),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A3780), 
+                      foregroundColor: Colors.white, 
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(
+                          30,
+                        ),
                       ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 16,
+                      ), // Yükseklik
                     ),
-                  );
-                },
-                child: const Text("Add New Task"),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              AddNewTaskScreen(addNewTask: (_) {}),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      "Add New Task",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
